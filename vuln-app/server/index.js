@@ -13,6 +13,7 @@ const express      = require('express');
 const cookieParser = require('cookie-parser');
 const path         = require('path');
 const fs           = require('fs');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const { initDB }   = require('./db');
 

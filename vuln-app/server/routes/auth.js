@@ -26,8 +26,7 @@ const loginLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// VULN M3 + M6: secret JWT faible et en dur dans le source
-const JWT_SECRET = "secret123";
+const JWT_EXPIRES_IN = '1h';
 
 /**
  * POST /auth/register
@@ -86,18 +85,33 @@ router.post('/login', loginLimiter, async (req, res) => {
     return res.status(401).json({ error: 'Identifiants invalides' });
   }
 
-  // VULN M3: JWT signé avec secret trivial, expiration longue
+  if (!process.env.JWT_SECRET) {
+    return res.status(500).json({ error: 'Configuration JWT manquante' });
+  }
+
   const token = jwt.sign(
     { id: user.id, email: user.email, role: user.role },
-    JWT_SECRET,
-    { expiresIn: '7d' }
+    process.env.JWT_SECRET,
+    { algorithm: 'HS256', expiresIn: JWT_EXPIRES_IN }
   );
 
-  // VULN M5: cookie sans HttpOnly ni Secure ni SameSite
-  res.cookie('token', token);
+  res.cookie('token', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 60 * 60 * 1000
+  });
 
-  res.json({ token, role: user.role });
+  res.json({ message: 'Connexion reussie', role: user.role });
+});
+
+router.post('/logout', (req, res) => {
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict'
+  });
+  return res.json({ message: 'Deconnexion reussie' });
 });
 
 module.exports = router;
-module.exports.JWT_SECRET = JWT_SECRET;

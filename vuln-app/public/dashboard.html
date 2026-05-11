@@ -52,24 +52,14 @@
 
   <script src="app.js"></script>
   <script>
-    // Vérifie si l'utilisateur est connecté
-    const token = localStorage.getItem('token');
-    const role  = localStorage.getItem('role');
-
-    if (!token) { window.location.href = 'login.html'; }
-
     document.getElementById('navUser').textContent = 'Connecté';
+    const al = document.getElementById('adminLink');
+    al.style.display = 'inline';
+    al.href = 'admin.html';
 
-    if (role === 'admin') {
-      const al = document.getElementById('adminLink');
-      al.style.display = 'inline';
-      al.href = 'admin.html';
-    }
-
-    document.getElementById('logoutBtn').addEventListener('click', (e) => {
+    document.getElementById('logoutBtn').addEventListener('click', async (e) => {
       e.preventDefault();
-      localStorage.clear();
-      window.location.href = 'login.html';
+      await logout();
     });
 
     // Charge les tâches
@@ -78,7 +68,11 @@
       // VULN M4: userId passé en query string → concaténé dans la SQL côté serveur
       const url = targetId ? `/tasks?userId=${targetId}` : '/tasks';
 
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(url, { credentials: 'include' });
+      if (res.status === 401) {
+        window.location.href = 'login.html';
+        return;
+      }
       const tasks = await res.json();
 
       const list = document.getElementById('taskList');
@@ -124,9 +118,9 @@
       await fetch('/tasks', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify({ title, content })
       });
 
@@ -139,7 +133,7 @@
     async function deleteTask(id) {
       await fetch(`/tasks/${id}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
+        credentials: 'include'
       });
       loadTasks();
     }

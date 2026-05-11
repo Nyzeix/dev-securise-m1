@@ -10,32 +10,10 @@
  */
 
 const express = require('express');
-const jwt     = require('jsonwebtoken');
 const { getDB } = require('../db');
-const { JWT_SECRET } = require('./auth');
+const authenticate = require('../middleware/authenticate');
 
 const router = express.Router();
-
-/**
- * Middleware d'authentification minimal.
- * VULN M3: vérifie juste que le token est présent et valide,
- * mais ne vérifie JAMAIS les autorisations sur les ressources.
- */
-function authenticate(req, res, next) {
-  const authHeader  = req.headers['authorization'];
-  const cookieToken = req.cookies && req.cookies.token;
-  const token       = (authHeader && authHeader.split(' ')[1]) || cookieToken;
-
-  if (!token) return res.status(401).json({ error: 'No token' });
-
-  try {
-    req.user = jwt.verify(token, JWT_SECRET);
-    next();
-  } catch (err) {
-    // VULN M6: fuite de stack trace
-    return res.status(401).json({ error: 'Invalid token', stack: err.stack });
-  }
-}
 
 /**
  * GET /tasks
@@ -68,12 +46,14 @@ router.get('/:id', authenticate, (req, res) => {
   const { id } = req.params;
 
   try {
-    // VULN M3: IDOR — n'importe quel utilisateur authentifié peut lire n'importe quelle tâche
     const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
     if (!task) return res.status(404).json({ error: 'Task not found' });
+    if (task.user_id !== req.user.id) {
+      return res.status(403).json({ error: 'Acces interdit' });
+    }
     res.json(task);
   } catch (err) {
-    res.status(500).json({ error: err.message, stack: err.stack });
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -113,14 +93,19 @@ router.put('/:id', authenticate, (req, res) => {
   const { title, content, shared } = req.body;
 
   try {
-    // VULN M3: n'importe quel user authentifié peut modifier n'importe quelle tâche
+    const task = db.prepare('SELECT user_id FROM tasks WHERE id = ?').get(id);
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+    if (task.user_id !== req.user.id) {
+      return res.status(403).json({ error: 'Acces interdit' });
+    }
+
     const stmt = db.prepare(
       'UPDATE tasks SET title = ?, content = ?, shared = ? WHERE id = ?'
     );
     stmt.run(title, content, shared ? 1 : 0, id);
     res.json({ message: 'Task updated' });
   } catch (err) {
-    res.status(500).json({ error: err.message, stack: err.stack });
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
@@ -135,11 +120,16 @@ router.delete('/:id', authenticate, (req, res) => {
   const { id } = req.params;
 
   try {
-    // VULN M3: IDOR — n'importe quel user peut supprimer n'importe quelle tâche
+    const task = db.prepare('SELECT user_id FROM tasks WHERE id = ?').get(id);
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+    if (task.user_id !== req.user.id) {
+      return res.status(403).json({ error: 'Acces interdit' });
+    }
+
     db.prepare('DELETE FROM tasks WHERE id = ?').run(id);
     res.json({ message: 'Task deleted' });
   } catch (err) {
-    res.status(500).json({ error: err.message, stack: err.stack });
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 

@@ -58,9 +58,6 @@
         return;
       }
 
-      // Stockage du token en localStorage (VULN M5: accessible au JS)
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('role', data.role);
       showMsg('okMsg', 'Connexion réussie, redirection...');
       setTimeout(() => { window.location.href = 'dashboard.html'; }, 800);
     });
