@@ -41,3 +41,4 @@ db/*.db-shm
 # Uploads
 uploads/
 vuln-app/uploads/
+vuln-app/private-uploads/

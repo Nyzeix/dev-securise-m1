@@ -11,9 +11,21 @@
 
 const express = require('express');
 const { getDB } = require('../db');
+const {
+  taskBodySchema,
+  taskUpdateSchema,
+  taskIdSchema
+} = require('../validators/tasks');
 const authenticate = require('../middleware/authenticate');
 
 const router = express.Router();
+
+function validationErrorResponse(error, res) {
+  return res.status(400).json({
+    error: 'Données invalides',
+    details: error.details.map((detail) => detail.message)
+  });
+}
 
 /**
  * GET /tasks
@@ -38,7 +50,13 @@ router.get('/', authenticate, (req, res) => {
  */
 router.get('/:id', authenticate, (req, res) => {
   const db   = getDB();
-  const { id } = req.params;
+  const { error, value } = taskIdSchema.validate(req.params, { abortEarly: false, convert: true });
+
+  if (error) {
+    return validationErrorResponse(error, res);
+  }
+
+  const { id } = value;
 
   try {
     const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
@@ -60,17 +78,27 @@ router.get('/:id', authenticate, (req, res) => {
  */
 router.post('/', authenticate, (req, res) => {
   const db = getDB();
-  const { title, content, shared } = req.body;
+  const { error, value } = taskBodySchema.validate(req.body, { abortEarly: false, convert: true });
 
-  // VULN M4: aucune validation — title peut contenir <script>alert(1)</script>
-  if (!title) return res.status(400).json({ error: 'title required' });
+  if (error) {
+    return validationErrorResponse(error, res);
+  }
+
+  const { title, content, shared } = value;
 
   try {
     const stmt = db.prepare(
       'INSERT INTO tasks (user_id, title, content, shared) VALUES (?, ?, ?, ?)'
     );
     const info = stmt.run(req.user.id, title, content || '', shared ? 1 : 0);
-    res.json({ id: info.lastInsertRowid, message: 'Task created' });
+    const createdTask = db.prepare(
+      'SELECT id FROM tasks WHERE user_id = ? ORDER BY id DESC LIMIT 1'
+    ).get(req.user.id);
+
+    res.json({
+      id: createdTask ? createdTask.id : info.lastInsertRowid,
+      message: 'Task created'
+    });
   } catch (err) {
     res.status(500).json({ error: err.message, stack: err.stack });
   }
@@ -84,8 +112,19 @@ router.post('/', authenticate, (req, res) => {
  */
 router.put('/:id', authenticate, (req, res) => {
   const db = getDB();
-  const { id } = req.params;
-  const { title, content, shared } = req.body;
+  const idCheck = taskIdSchema.validate(req.params, { abortEarly: false, convert: true });
+  const bodyCheck = taskUpdateSchema.validate(req.body, { abortEarly: false, convert: true });
+
+  if (idCheck.error) {
+    return validationErrorResponse(idCheck.error, res);
+  }
+
+  if (bodyCheck.error) {
+    return validationErrorResponse(bodyCheck.error, res);
+  }
+
+  const { id } = idCheck.value;
+  const { title, content, shared } = bodyCheck.value;
 
   try {
     const task = db.prepare('SELECT user_id FROM tasks WHERE id = ?').get(id);
@@ -112,7 +151,13 @@ router.put('/:id', authenticate, (req, res) => {
  */
 router.delete('/:id', authenticate, (req, res) => {
   const db = getDB();
-  const { id } = req.params;
+  const { error, value } = taskIdSchema.validate(req.params, { abortEarly: false, convert: true });
+
+  if (error) {
+    return validationErrorResponse(error, res);
+  }
+
+  const { id } = value;
 
   try {
     const task = db.prepare('SELECT user_id FROM tasks WHERE id = ?').get(id);

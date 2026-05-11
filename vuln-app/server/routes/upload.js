@@ -11,22 +11,43 @@
 const express = require('express');
 const multer  = require('multer');
 const path    = require('path');
+const fs      = require('fs');
+const crypto  = require('crypto');
+const authenticate = require('../middleware/authenticate');
 
 const router = express.Router();
 
-// VULN M4: diskStorage avec filename qui utilise le nom original SANS sanitization
+const uploadDir = path.join(__dirname, '..', '..', 'private-uploads');
+const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.gif', '.pdf']);
+
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, '..', '..', 'uploads'));
+    cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    // VULN M4: nom de fichier original — permet path traversal (ex: ../../server/evil.js)
-    cb(null, file.originalname);
+    const ext = path.extname(file.originalname).toLowerCase();
+    const randomName = `${crypto.randomBytes(16).toString('hex')}${ext}`;
+    cb(null, randomName);
   }
 });
 
-// VULN M4: aucun filtre fileFilter — accepte n'importe quel type de fichier (.php, .exe, .js...)
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!allowedExtensions.has(ext)) {
+      req.fileValidationError = 'Extension non autorisée';
+      return cb(null, false);
+    }
+
+    cb(null, true);
+  },
+  limits: { fileSize: 5 * 1024 * 1024 }
+});
 
 /**
  * POST /upload
@@ -35,17 +56,29 @@ const upload = multer({ storage });
  * VULN M4: pas de validation type/extension/taille.
  * VULN M6: chemin absolu retourné dans la réponse.
  */
-router.post('/', upload.single('file'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'No file provided' });
-  }
+router.post('/', authenticate, (req, res) => {
+  upload.single('file')(req, res, (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ error: 'Fichier trop volumineux' });
+      }
 
-  // VULN M6: exposition du chemin serveur complet
-  res.json({
-    message: 'File uploaded',
-    filename: req.file.originalname,
-    path: req.file.path,          // chemin absolu sur le serveur
-    size: req.file.size
+      return res.status(400).json({ error: err.message });
+    }
+
+    if (req.fileValidationError) {
+      return res.status(400).json({ error: req.fileValidationError });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file provided' });
+    }
+
+    res.json({
+      message: 'File uploaded',
+      filename: req.file.filename,
+      size: req.file.size
+    });
   });
 });
 

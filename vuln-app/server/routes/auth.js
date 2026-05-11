@@ -14,6 +14,7 @@ const express = require('express');
 const bcrypt  = require('bcryptjs');
 const jwt     = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
+const { validateRegisterBody, validateLoginBody } = require('../validators/auth');
 const { getDB } = require('../db');
 
 const router = express.Router();
@@ -34,16 +35,17 @@ const JWT_EXPIRES_IN = '1h';
  * VULN M2: password stocké en clair, aucun hashage.
  */
 router.post('/register', async (req, res) => {
-  const { email, password } = req.body;
+  const { error, value } = validateRegisterBody(req.body);
   const db = getDB();
 
-  if (!email || !password) {
-    return res.status(400).json({ error: 'email and password required' });
+  if (error) {
+    return res.status(400).json({
+      error: 'Données invalides',
+      details: error.details.map((detail) => detail.message)
+    });
   }
 
-  if (password.length < 12) {
-    return res.status(400).json({ error: 'Password must be at least 12 characters' });
-  }
+  const { email, password } = value;
 
   try {
     const hash = await bcrypt.hash(password, 12);
@@ -65,14 +67,19 @@ router.post('/register', async (req, res) => {
  * VULN M6: log du couple email/password dans la console.
  */
 router.post('/login', loginLimiter, async (req, res) => {
-  const { email, password } = req.body;
+  const { error, value } = validateLoginBody(req.body);
   const db = getDB();
 
-  console.log('login attempt:', email);
+  console.log('login attempt:', req.body.email);
 
-  if (!email || !password) {
-    return res.status(400).json({ error: 'email and password required' });
+  if (error) {
+    return res.status(400).json({
+      error: 'Données invalides',
+      details: error.details.map((detail) => detail.message)
+    });
   }
+
+  const { email, password } = value;
 
   const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
 

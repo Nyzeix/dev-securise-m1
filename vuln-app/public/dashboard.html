@@ -79,8 +79,14 @@
         const body = document.createElement('div');
         body.className = 'task-body';
 
-        // VULN M4: XSS stocké, titre injecté via innerHTML sans sanitization
-        body.innerHTML = `<h3>${task.title}</h3><p>${task.content || ''}</p>`;
+        const title = document.createElement('h3');
+        title.textContent = task.title;
+
+        const content = document.createElement('p');
+        content.textContent = task.content || '';
+
+        body.appendChild(title);
+        body.appendChild(content);
 
         const actions = document.createElement('div');
         actions.className = 'task-actions';
@@ -141,7 +147,7 @@
 
       const msg = document.getElementById('uploadMsg');
       msg.textContent = res.ok
-        ? `Fichier uploadé : ${data.path}`   // VULN M6: affiche le chemin serveur
+        ? `Fichier uploadé : ${data.filename}`
         : `Erreur : ${data.error}`;
       msg.className = 'msg ' + (res.ok ? 'success' : 'error');
       msg.style.display = 'block';
