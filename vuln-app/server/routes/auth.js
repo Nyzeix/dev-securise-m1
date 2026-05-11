@@ -11,10 +11,20 @@
  */
 
 const express = require('express');
+const bcrypt  = require('bcryptjs');
 const jwt     = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
 const { getDB } = require('../db');
 
 const router = express.Router();
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { error: 'Trop de tentatives, réessayez dans 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // VULN M3 + M6: secret JWT faible et en dur dans le source
 const JWT_SECRET = "secret123";
@@ -24,7 +34,7 @@ const JWT_SECRET = "secret123";
  * Crée un compte utilisateur.
  * VULN M2: password stocké en clair, aucun hashage.
  */
-router.post('/register', (req, res) => {
+router.post('/register', async (req, res) => {
   const { email, password } = req.body;
   const db = getDB();
 
@@ -32,14 +42,20 @@ router.post('/register', (req, res) => {
     return res.status(400).json({ error: 'email and password required' });
   }
 
+  if (password.length < 12) {
+    return res.status(400).json({ error: 'Password must be at least 12 characters' });
+  }
+
   try {
-    // VULN M2: insertion du mot de passe en clair
+    const hash = await bcrypt.hash(password, 12);
     const stmt = db.prepare('INSERT INTO users (email, password, role) VALUES (?, ?, ?)');
-    stmt.run(email, password, 'user');
-    res.json({ message: 'User created' });
+    stmt.run(email, hash, 'user');
+    res.status(201).json({ message: 'User created' });
   } catch (err) {
-    // VULN M6: fuite de stack trace complète au client
-    res.status(500).json({ error: err.message, stack: err.stack });
+    if (err.message.includes('UNIQUE constraint')) {
+      return res.status(409).json({ error: 'Email already exists' });
+    }
+    res.status(500).json({ error: 'Registration failed' });
   }
 });
 
@@ -49,23 +65,25 @@ router.post('/register', (req, res) => {
  * VULN M2: messages d'erreur différenciés → enumération utilisateurs.
  * VULN M6: log du couple email/password dans la console.
  */
-router.post('/login', (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   const { email, password } = req.body;
   const db = getDB();
 
-  // VULN M6: mot de passe visible dans les logs serveur
-  console.log('login attempt:', email, password);
+  console.log('login attempt:', email);
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'email and password required' });
+  }
 
   const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
 
   if (!user) {
-    // VULN M2: message différent selon que le user existe ou non
-    return res.status(401).json({ error: 'User not found' });
+    return res.status(401).json({ error: 'Identifiants invalides' });
   }
 
-  // VULN M2: comparaison en clair au lieu de bcrypt.compare()
-  if (user.password !== password) {
-    return res.status(401).json({ error: 'Wrong password' });
+  const passwordMatch = await bcrypt.compare(password, user.password);
+  if (!passwordMatch) {
+    return res.status(401).json({ error: 'Identifiants invalides' });
   }
 
   // VULN M3: JWT signé avec secret trivial, expiration longue
