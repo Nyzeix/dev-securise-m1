@@ -34,3 +34,10 @@ logs/
 # Vuln-app DB
 vuln-app/db/*.sqlite
 vuln-app/db/*.db
+db/*.db
+db/*.db-wal
+db/*.db-shm
+
+# Uploads
+uploads/
+vuln-app/uploads/

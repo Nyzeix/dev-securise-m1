@@ -1,0 +1,30 @@
+
+# Secrets et configuration locale
+.env
+.env.*
+.env.local
+.env.*.local
+
+# Base de données SQLite
+db/*.db
+db/*.db-wal
+db/*.db-shm
+
+# Dépendances
+node_modules/
+
+# Fichiers uploadés
+uploads/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Copier ce fichier en .env et remplir les valeurs
+PORT=3000
+JWT_SECRET=remplacer_par_une_valeur_forte_32_chars_min
+NODE_ENV=development
