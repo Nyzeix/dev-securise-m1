@@ -1,0 +1,36 @@
+# Dépendances
+node_modules/
+__pycache__/
+*.pyc
+target/
+
+# Secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Builds (les PDF générés SONT commités dans /pdf/ et COURS-COMPLET.pdf)
+build/html/
+build/pdf/
+build/chrome-tmp-*/
+build/build.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Vuln-app DB
+vuln-app/db/*.sqlite
+vuln-app/db/*.db

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TaskFlow, Connexion</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav>
+    <span class="brand">TaskFlow</span>
+    <a href="index.html">Accueil</a>
+    <a href="register.html">Inscription</a>
+  </nav>
+
+  <div class="container" style="max-width:440px;">
+    <div class="card">
+      <h2>Connexion</h2>
+      <!-- VULN M5: pas de CSRF token dans ce formulaire -->
+      <div class="msg error" id="errMsg"></div>
+      <div class="msg success" id="okMsg"></div>
+
+      <form id="loginForm">
+        <label for="email">Email</label>
+        <input type="email" id="email" placeholder="alice@taskflow.io" required>
+
+        <label for="password">Mot de passe</label>
+        <input type="password" id="password" placeholder="Votre mot de passe" required>
+
+        <button type="submit" style="width:100%;">Se connecter</button>
+      </form>
+
+      <p style="margin-top:16px;font-size:13px;color:#666;">
+        Pas encore de compte ? <a href="register.html">Créer un compte</a>
+      </p>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email    = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+
+      // VULN M5: requête POST sans CSRF token
+      const res = await fetch('/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+        credentials: 'include'
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        showMsg('errMsg', data.error || 'Erreur de connexion');
+        return;
+      }
+
+      // Stockage du token en localStorage (VULN M5: accessible au JS)
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('role', data.role);
+      showMsg('okMsg', 'Connexion réussie, redirection...');
+      setTimeout(() => { window.location.href = 'dashboard.html'; }, 800);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "taskflow-vuln",
+  "version": "1.0.0",
+  "description": "TaskFlow — App volontairement vulnérable pour TP audit sécurité M1",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js"
+  },
+  "dependencies": {
+    "sql.js": "^1.12.0",
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.6",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1"
+  }
+}

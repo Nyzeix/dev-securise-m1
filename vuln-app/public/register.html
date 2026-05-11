@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TaskFlow, Inscription</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav>
+    <span class="brand">TaskFlow</span>
+    <a href="index.html">Accueil</a>
+    <a href="login.html">Connexion</a>
+  </nav>
+
+  <div class="container" style="max-width:440px;">
+    <div class="card">
+      <h2>Créer un compte</h2>
+      <!-- VULN M5: pas de CSRF token dans ce formulaire -->
+      <div class="msg error"   id="errMsg"></div>
+      <div class="msg success" id="okMsg"></div>
+
+      <form id="registerForm">
+        <label for="email">Email</label>
+        <input type="email" id="email" placeholder="vous@exemple.fr" required>
+
+        <label for="password">Mot de passe</label>
+        <!-- VULN M2: aucune règle de complexité imposée côté client OU serveur -->
+        <input type="password" id="password" placeholder="Choisissez un mot de passe" required>
+
+        <button type="submit" style="width:100%;">Créer le compte</button>
+      </form>
+
+      <p style="margin-top:16px;font-size:13px;color:#666;">
+        Déjà un compte ? <a href="login.html">Se connecter</a>
+      </p>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    document.getElementById('registerForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email    = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+
+      const res = await fetch('/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        showMsg('errMsg', data.error || 'Erreur lors de la création');
+        return;
+      }
+
+      showMsg('okMsg', 'Compte créé ! Redirection vers la connexion...');
+      setTimeout(() => { window.location.href = 'login.html'; }, 1000);
+    });
+  </script>
+</body>
+</html>

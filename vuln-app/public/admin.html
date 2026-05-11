@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TaskFlow, Administration</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav>
+    <span class="brand">TaskFlow, Admin</span>
+    <a href="dashboard.html">Tableau de bord</a>
+    <a href="#" id="logoutBtn">Déconnexion</a>
+  </nav>
+
+  <div class="container">
+    <div class="card">
+      <h2>Gestion des utilisateurs</h2>
+      <p style="font-size:13px;color:#e74c3c;margin-bottom:16px;">
+        <!-- VULN M3: cette page est accessible à TOUS les users authentifiés -->
+        Note : route /admin/users accessible à tout utilisateur connecté (pas seulement admin).
+      </p>
+      <button onclick="loadUsers()" style="margin-bottom:16px;">Charger les utilisateurs</button>
+      <div id="usersContainer"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    const token = localStorage.getItem('token');
+    if (!token) { window.location.href = 'login.html'; }
+
+    document.getElementById('logoutBtn').addEventListener('click', (e) => {
+      e.preventDefault();
+      localStorage.clear();
+      window.location.href = 'login.html';
+    });
+
+    async function loadUsers() {
+      // VULN M3: n'importe quel user authentifié peut appeler cette route
+      const res   = await fetch('/admin/users', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const users = await res.json();
+
+      const container = document.getElementById('usersContainer');
+
+      if (!res.ok) {
+        container.innerHTML = `<div class="msg error" style="display:block;">${users.error}</div>`;
+        return;
+      }
+
+      // VULN M4: affiche les mots de passe en clair retournés par l'API
+      let html = '<table><thead><tr><th>ID</th><th>Email</th><th>Mot de passe</th><th>Rôle</th><th>Action</th></tr></thead><tbody>';
+      users.forEach(u => {
+        html += `<tr>
+          <td>${u.id}</td>
+          <td>${u.email}</td>
+          <td style="color:#e74c3c;font-weight:bold;">${u.password}</td>
+          <td><span class="badge ${u.role}">${u.role}</span></td>
+          <td><button class="danger" onclick="deleteUser(${u.id})">Supprimer</button></td>
+        </tr>`;
+      });
+      html += '</tbody></table>';
+      container.innerHTML = html;
+    }
+
+    async function deleteUser(id) {
+      if (!confirm(`Supprimer l'utilisateur #${id} ?`)) return;
+      // VULN M3: tout user authentifié peut supprimer n'importe quel compte
+      await fetch(`/admin/users/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      loadUsers();
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TaskFlow, Accueil</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav>
+    <span class="brand">TaskFlow</span>
+    <a href="login.html">Connexion</a>
+    <a href="register.html">Inscription</a>
+  </nav>
+
+  <div class="container">
+    <div class="card" style="text-align:center;padding:48px;">
+      <h1>Bienvenue sur TaskFlow</h1>
+      <p style="color:#666;margin:16px 0 32px;">Gérez vos tâches et partagez-les avec votre équipe.</p>
+      <a href="register.html"><button>Créer un compte</button></a>
+      &nbsp;
+      <a href="login.html"><button style="background:#27ae60;">Se connecter</button></a>
+    </div>
+
+    <div class="card">
+      <h2>Comptes de test</h2>
+      <table>
+        <thead>
+          <tr><th>Email</th><th>Mot de passe</th><th>Rôle</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>alice@taskflow.io</td><td>alice123</td><td><span class="badge user">user</span></td></tr>
+          <tr><td>bob@taskflow.io</td><td>bob456</td><td><span class="badge user">user</span></td></tr>
+          <tr><td>admin@taskflow.io</td><td>adminpass</td><td><span class="badge admin">admin</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>

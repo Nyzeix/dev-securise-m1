@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TaskFlow, Tableau de bord</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav>
+    <span class="brand">TaskFlow</span>
+    <a href="index.html">Accueil</a>
+    <span id="navUser" style="color:#bdc3c7;font-size:13px;margin-left:auto;margin-right:12px;"></span>
+    <a href="#" id="adminLink" style="display:none;" href="admin.html">Admin</a>
+    <a href="#" id="logoutBtn">Déconnexion</a>
+  </nav>
+
+  <div class="container">
+    <div class="card">
+      <h2>Mes tâches</h2>
+
+      <!-- Formulaire de création, VULN M5: pas de CSRF token -->
+      <form id="createForm" style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
+        <input type="text" id="newTitle" placeholder="Titre de la tâche" style="flex:2;min-width:180px;margin:0;">
+        <input type="text" id="newContent" placeholder="Description (optionnel)" style="flex:3;min-width:180px;margin:0;">
+        <button type="submit">Ajouter</button>
+      </form>
+
+      <!-- VULN M4: Filtre userId, injecte directement dans la query SQL via ?userId= -->
+      <div style="margin-bottom:14px;font-size:13px;color:#888;">
+        Voir les tâches d'un autre user (IDOR) :
+        <input type="number" id="targetUserId" placeholder="user ID" style="width:80px;margin:0 6px;">
+        <button onclick="loadTasks()">Filtrer</button>
+      </div>
+
+      <ul class="task-list" id="taskList">
+        <li style="color:#aaa;padding:10px;">Chargement...</li>
+      </ul>
+    </div>
+
+    <!-- Zone upload, VULN M4: accepte tous les types de fichiers -->
+    <div class="card">
+      <h2>Uploader un fichier</h2>
+      <form id="uploadForm" enctype="multipart/form-data">
+        <input type="file" id="fileInput" style="margin-bottom:10px;">
+        <br>
+        <button type="submit">Envoyer</button>
+      </form>
+      <div class="msg" id="uploadMsg" style="margin-top:12px;"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    // Vérifie si l'utilisateur est connecté
+    const token = localStorage.getItem('token');
+    const role  = localStorage.getItem('role');
+
+    if (!token) { window.location.href = 'login.html'; }
+
+    document.getElementById('navUser').textContent = 'Connecté';
+
+    if (role === 'admin') {
+      const al = document.getElementById('adminLink');
+      al.style.display = 'inline';
+      al.href = 'admin.html';
+    }
+
+    document.getElementById('logoutBtn').addEventListener('click', (e) => {
+      e.preventDefault();
+      localStorage.clear();
+      window.location.href = 'login.html';
+    });
+
+    // Charge les tâches
+    async function loadTasks() {
+      const targetId = document.getElementById('targetUserId').value;
+      // VULN M4: userId passé en query string → concaténé dans la SQL côté serveur
+      const url = targetId ? `/tasks?userId=${targetId}` : '/tasks';
+
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      const tasks = await res.json();
+
+      const list = document.getElementById('taskList');
+      list.innerHTML = '';
+
+      if (!Array.isArray(tasks) || tasks.length === 0) {
+        list.innerHTML = '<li style="color:#aaa;padding:10px;">Aucune tâche.</li>';
+        return;
+      }
+
+      tasks.forEach(task => {
+        const li = document.createElement('li');
+        li.className = 'task-item';
+
+        const body = document.createElement('div');
+        body.className = 'task-body';
+
+        // VULN M4: XSS stocké, titre injecté via innerHTML sans sanitization
+        body.innerHTML = `<h3>${task.title}</h3><p>${task.content || ''}</p>`;
+
+        const actions = document.createElement('div');
+        actions.className = 'task-actions';
+
+        const delBtn = document.createElement('button');
+        delBtn.textContent = 'Supprimer';
+        delBtn.className = 'danger';
+        // VULN M3: IDOR, peut supprimer n'importe quelle tâche via son ID
+        delBtn.onclick = () => deleteTask(task.id);
+
+        actions.appendChild(delBtn);
+        li.appendChild(body);
+        li.appendChild(actions);
+        list.appendChild(li);
+      });
+    }
+
+    // Création d'une tâche
+    document.getElementById('createForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const title   = document.getElementById('newTitle').value;
+      const content = document.getElementById('newContent').value;
+
+      await fetch('/tasks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ title, content })
+      });
+
+      document.getElementById('newTitle').value   = '';
+      document.getElementById('newContent').value = '';
+      loadTasks();
+    });
+
+    // Suppression d'une tâche (IDOR)
+    async function deleteTask(id) {
+      await fetch(`/tasks/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      loadTasks();
+    }
+
+    // Upload
+    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const file = document.getElementById('fileInput').files[0];
+      if (!file) return;
+
+      const fd = new FormData();
+      fd.append('file', file);
+
+      const res  = await fetch('/upload', { method: 'POST', body: fd });
+      const data = await res.json();
+
+      const msg = document.getElementById('uploadMsg');
+      msg.textContent = res.ok
+        ? `Fichier uploadé : ${data.path}`   // VULN M6: affiche le chemin serveur
+        : `Erreur : ${data.error}`;
+      msg.className = 'msg ' + (res.ok ? 'success' : 'error');
+      msg.style.display = 'block';
+    });
+
+    // Chargement initial
+    loadTasks();
+  </script>
+</body>
+</html>
