@@ -18,21 +18,16 @@ const router = express.Router();
 /**
  * GET /tasks
  * Retourne les tâches de l'utilisateur connecté.
- * VULN M4: userId injecté directement dans la requête SQL par concaténation.
  */
 router.get('/', authenticate, (req, res) => {
-  const db     = getDB();
-  const userId = req.query.userId || req.user.id;
+  const db = getDB();
+  const userId = req.user.id;
 
   try {
-    // VULN M4: SQL INJECTION — userId non paramétré
-    const query = `SELECT * FROM tasks WHERE user_id = ${userId}`;
-    console.log('Executing query:', query);
-    const tasks = db.prepare(query).all();
+    const tasks = db.prepare('SELECT * FROM tasks WHERE user_id = ?').all(userId);
     res.json(tasks);
   } catch (err) {
-    // VULN M6: stack trace au client
-    res.status(500).json({ error: err.message, stack: err.stack });
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 

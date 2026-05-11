@@ -26,13 +26,6 @@
         <button type="submit">Ajouter</button>
       </form>
 
-      <!-- VULN M4: Filtre userId, injecte directement dans la query SQL via ?userId= -->
-      <div style="margin-bottom:14px;font-size:13px;color:#888;">
-        Voir les tâches d'un autre user (IDOR) :
-        <input type="number" id="targetUserId" placeholder="user ID" style="width:80px;margin:0 6px;">
-        <button onclick="loadTasks()">Filtrer</button>
-      </div>
-
       <ul class="task-list" id="taskList">
         <li style="color:#aaa;padding:10px;">Chargement...</li>
       </ul>
@@ -64,11 +57,7 @@
 
     // Charge les tâches
     async function loadTasks() {
-      const targetId = document.getElementById('targetUserId').value;
-      // VULN M4: userId passé en query string → concaténé dans la SQL côté serveur
-      const url = targetId ? `/tasks?userId=${targetId}` : '/tasks';
-
-      const res = await fetch(url, { credentials: 'include' });
+      const res = await fetch('/tasks', { credentials: 'include' });
       if (res.status === 401) {
         window.location.href = 'login.html';
         return;
